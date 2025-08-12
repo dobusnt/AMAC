@@ -12,8 +12,7 @@ from urllib.parse import urlparse
 
 import httpx
 
-from ..models import Timeouts, AuthScheme, PrivacyLevel
-
+from ..models import AuthScheme, PrivacyLevel, Timeouts
 
 # -----------------------------
 # Simple async rate limiter (tokens per 1s window)

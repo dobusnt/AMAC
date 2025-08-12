@@ -1,11 +1,15 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, asdict
+import json
+from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-import orjson
+try:  # Try orjson for speed; fall back to stdlib json
+    import orjson  # type: ignore
+except ModuleNotFoundError:  # pragma: no cover - environments without orjson
+    orjson = None
 
 
 @dataclass
@@ -22,11 +26,17 @@ class Finding:
 
 
 def _load_json(path: Path) -> Dict[str, Any]:
-    return orjson.loads(path.read_bytes())
+    data = path.read_bytes()
+    if orjson:
+        return orjson.loads(data)
+    return json.loads(data.decode("utf-8"))
 
 
 def _dump_json(obj: Any, path: Path) -> None:
-    path.write_bytes(orjson.dumps(obj, option=orjson.OPT_INDENT_2))
+    if orjson:
+        path.write_bytes(orjson.dumps(obj, option=orjson.OPT_INDENT_2))
+    else:
+        path.write_text(json.dumps(obj, indent=2), encoding="utf-8")
 
 
 def _pct_diff(a: int, b: int) -> float:
@@ -171,7 +181,7 @@ def analyze_run_dir(run_dir: Path) -> Tuple[Path, Path]:
 
     # Write a tiny Markdown overview
     md_lines: List[str] = []
-    md_lines.append(f"# Findings — AMAC\n")
+    md_lines.append("# Findings — AMAC\n")
     md_lines.append(f"- Generated: {findings['generated_at']}")
     counts = findings["counts"]
     md_lines.append(f"- Endpoints analyzed: {counts['total_endpoints']}")

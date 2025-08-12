@@ -5,22 +5,22 @@ from datetime import datetime
 from pathlib import Path
 from typing import List
 
-import orjson
 import typer
 from rich.console import Console
 from rich.table import Table
 
 from . import __version__
+from ._json import dumps, loads
 from .config import (
-    load_scope_config,
-    load_auth_config,
     assert_urls_in_scope,
+    load_auth_config,
+    load_scope_config,
 )
-from .models import EndpointSet
-from .discovery.openapi import load_and_map_openapi
-from .runner import run_basic_probes
 from .diffing import analyze_run_dir
+from .discovery.openapi import load_and_map_openapi
+from .models import EndpointSet
 from .report import render_report
+from .runner import run_basic_probes
 
 app = typer.Typer(add_completion=False, help="AMAC — API Mapper + Auth Checker")
 console = Console()
@@ -67,12 +67,11 @@ def version() -> None:  # allows `amac version` as well
 def _write_json(obj, out_path: Path) -> None:
     out_path.parent.mkdir(parents=True, exist_ok=True)
     payload = obj.model_dump() if hasattr(obj, "model_dump") else obj
-    data = orjson.dumps(payload, option=orjson.OPT_INDENT_2)
-    out_path.write_bytes(data)
+    out_path.write_bytes(dumps(payload))
 
 
 def _read_json(path: Path) -> dict:
-    return orjson.loads(path.read_bytes())
+    return loads(path.read_bytes())
 
 
 def _show_endpoints_table(es: EndpointSet, limit: int = 12) -> None:

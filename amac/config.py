@@ -1,17 +1,29 @@
-from __future__ import annotations
-
 import os
 import re
 from fnmatch import fnmatch
 from pathlib import Path
-from typing import Iterable, Optional
+from typing import Iterable, List
 from urllib.parse import urlparse
 
-import yaml
-from pydantic import ValidationError
+try:  # Prefer PyYAML but fall back to minimal parser
+    import yaml  # type: ignore
+except ModuleNotFoundError:  # pragma: no cover - fallback for environments without PyYAML
+    from . import _yaml as yaml
 
-from .models import ScopeConfig, AuthConfig
+try:  # Optional pydantic for rich validation
+    from pydantic import ValidationError  # type: ignore
+except ModuleNotFoundError:  # pragma: no cover - fallback when pydantic missing
+    ValidationError = Exception  # type: ignore
 
+from .models import (
+    AuthConfig,
+    AuthScheme,
+    EvidencePolicy,
+    PathPolicy,
+    RequestPolicy,
+    ScopeConfig,
+    Timeouts,
+)
 
 # -----------------------------
 # YAML loaders
@@ -28,17 +40,44 @@ def _read_yaml(path: str | os.PathLike) -> dict:
     return data
 
 
+# -----------------------------
+# Config loaders
+# -----------------------------
+
 def load_scope_config(path: str | os.PathLike) -> ScopeConfig:
     """Load and validate scope.yml into a ScopeConfig."""
     raw = _read_yaml(path)
-    try:
-        cfg = ScopeConfig.model_validate(raw)
-    except ValidationError as ve:
-        raise ValueError(f"Invalid scope config {path}:\n{ve}") from ve
+    if hasattr(ScopeConfig, "model_validate"):
+        try:
+            cfg = ScopeConfig.model_validate(raw)
+        except ValidationError as ve:
+            raise ValueError(f"Invalid scope config {path}:\n{ve}") from ve
+    else:  # dataclass fallback
+        allowed = [str(s).strip().lower() for s in raw.get("allowed", []) or []]
+        base_urls = [str(s).strip() for s in raw.get("base_urls", []) or []]
+        denied = [str(s).strip().lower() for s in raw.get("denied", []) or []]
+        pp_raw = raw.get("path_policy", {}) or {}
+        path_policy = PathPolicy(
+            allow_paths=[str(s).strip() for s in pp_raw.get("allow_paths", []) or []],
+            deny_paths=[str(s).strip() for s in pp_raw.get("deny_paths", []) or []],
+        )
+        rp = RequestPolicy(**(raw.get("request_policy", {}) or {}))
+        to = Timeouts(**(raw.get("timeouts", {}) or {}))
+        ev = EvidencePolicy(**(raw.get("evidence", {}) or {}))
+        cfg = ScopeConfig(
+            allowed=allowed,
+            base_urls=base_urls,
+            denied=denied,
+            path_policy=path_policy,
+            request_policy=rp,
+            timeouts=to,
+            evidence=ev,
+            evidence_dir=str(raw.get("evidence_dir", "./evidence")),
+        )
 
     if not cfg.allowed and not cfg.base_urls:
         raise ValueError(
-            "scope.yml must specify at least one of `allowed` hosts or `base_urls`."
+            "scope.yml must specify at least one of `allowed` hosts or `base_urls`.",
         )
     return cfg
 
@@ -46,10 +85,21 @@ def load_scope_config(path: str | os.PathLike) -> ScopeConfig:
 def load_auth_config(path: str | os.PathLike) -> AuthConfig:
     """Load and validate auth.yml into an AuthConfig."""
     raw = _read_yaml(path)
-    try:
-        cfg = AuthConfig.model_validate(raw)
-    except ValidationError as ve:
-        raise ValueError(f"Invalid auth config {path}:\n{ve}") from ve
+    if hasattr(AuthConfig, "model_validate"):
+        try:
+            cfg = AuthConfig.model_validate(raw)
+        except ValidationError as ve:
+            raise ValueError(f"Invalid auth config {path}:\n{ve}") from ve
+    else:  # dataclass fallback
+        schemes_raw = raw.get("auth_schemes", []) or []
+        schemes: List[AuthScheme] = []
+        for item in schemes_raw:
+            if isinstance(item, dict):
+                name = str(item.get("name", ""))
+                atype = str(item.get("type", ""))
+                if name and atype:
+                    schemes.append(AuthScheme(name=name, type=atype))
+        cfg = AuthConfig(auth_schemes=schemes)
 
     if not cfg.auth_schemes:
         raise ValueError("auth.yml must contain at least one auth scheme in `auth_schemes`.")
