@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Iterable, List
 from urllib.parse import urlparse
 
+
 try:  # Prefer PyYAML but fall back to minimal parser
     import yaml  # type: ignore
 except ModuleNotFoundError:  # pragma: no cover - fallback for environments without PyYAML
