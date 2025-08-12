@@ -6,8 +6,10 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 from urllib.parse import urljoin
 
-import httpx
-import yaml
+try:  # Use PyYAML if available, else fall back to internal minimal parser
+    import yaml  # type: ignore
+except ModuleNotFoundError:  # pragma: no cover - fallback
+    from .. import _yaml as yaml
 
 from ..config import choose_base_urls, is_url_in_scope, is_url_path_allowed
 from ..models import Endpoint, EndpointSet, ScopeConfig
@@ -19,10 +21,12 @@ from .sampler import sample_param_value, fill_server_variables
 # -----------------------------
 
 async def _load_spec(src: str) -> Dict[str, Any]:
-    """
-    Load an OpenAPI doc from a local path or HTTP(S) URL (JSON or YAML).
-    """
+    """Load an OpenAPI doc from a local path or HTTP(S) URL (JSON or YAML)."""
     if src.lower().startswith(("http://", "https://")):
+        try:  # Import httpx only when needed
+            import httpx  # type: ignore
+        except ModuleNotFoundError as e:  # pragma: no cover
+            raise RuntimeError("httpx is required to fetch remote OpenAPI documents") from e
         async with httpx.AsyncClient(timeout=20) as client:
             r = await client.get(src)
             r.raise_for_status()
@@ -159,12 +163,14 @@ def _apply_path_template(path_template: str, params: List[Dict[str, Any]]) -> st
 
 
 def _build_query(params: List[Dict[str, Any]]) -> str:
-    """
-    Build a query string for required query params, using sampler.
-    """
+    """Build a query string for required or defaulted query parameters."""
     items: List[str] = []
     for p in params:
-        if p.get("in") == "query" and p.get("required", False):
+        if p.get("in") != "query":
+            continue
+        schema = p.get("schema") or {}
+        has_default = isinstance(schema, dict) and "default" in schema
+        if p.get("required", False) or has_default:
             name = str(p.get("name", "q"))
             val = sample_param_value(p)
             items.append(f"{name}={val}")
