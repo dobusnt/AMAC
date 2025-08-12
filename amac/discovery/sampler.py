@@ -1,10 +1,7 @@
 from __future__ import annotations
 
 import datetime as _dt
-import random
-import re
 from typing import Any, Dict, Optional
-
 
 _UUID = "00000000-0000-4000-8000-000000000000"
 _EMAIL = "user@example.com"

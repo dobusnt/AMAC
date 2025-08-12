@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-import json
 import zipfile
 from pathlib import Path
 from typing import Any, Dict
 
-import orjson
-
+from .._json import dumps
 
 REDACT_HEADER_KEYS = {"authorization", "proxy-authorization", "cookie", "x-api-key", "api-key"}
 
@@ -31,7 +29,7 @@ def write_snapshot(obj: Any, path: Path) -> None:
         payload = obj.model_dump()
     else:
         payload = obj
-    path.write_bytes(orjson.dumps(payload, option=orjson.OPT_INDENT_2))
+    path.write_bytes(dumps(payload))
 
 
 def package_evidence_dir(evidence_dir: Path, out_zip: Path) -> Path:

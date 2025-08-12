@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, asdict
+import json
+from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-import json
 try:  # Try orjson for speed; fall back to stdlib json
     import orjson  # type: ignore
 except ModuleNotFoundError:  # pragma: no cover - environments without orjson
@@ -181,7 +181,7 @@ def analyze_run_dir(run_dir: Path) -> Tuple[Path, Path]:
 
     # Write a tiny Markdown overview
     md_lines: List[str] = []
-    md_lines.append(f"# Findings — AMAC\n")
+    md_lines.append("# Findings — AMAC\n")
     md_lines.append(f"- Generated: {findings['generated_at']}")
     counts = findings["counts"]
     md_lines.append(f"- Endpoints analyzed: {counts['total_endpoints']}")

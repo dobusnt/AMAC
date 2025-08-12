@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import json
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -13,8 +12,7 @@ except ModuleNotFoundError:  # pragma: no cover - fallback
 
 from ..config import choose_base_urls, is_url_in_scope, is_url_path_allowed
 from ..models import Endpoint, EndpointSet, ScopeConfig
-from .sampler import sample_param_value, fill_server_variables
-
+from .sampler import fill_server_variables, sample_param_value
 
 # -----------------------------
 # Loaders

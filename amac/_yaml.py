@@ -1,6 +1,7 @@
 import json
 import re
-from typing import Any, Tuple, List
+from typing import Any, List, Tuple
+
 
 def safe_load(stream: Any) -> Any:
     """A tiny YAML subset parser used for tests.

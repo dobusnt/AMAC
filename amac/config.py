@@ -2,8 +2,9 @@ import os
 import re
 from fnmatch import fnmatch
 from pathlib import Path
-from typing import Iterable, Optional, List
+from typing import Iterable, List
 from urllib.parse import urlparse
+
 
 try:  # Prefer PyYAML but fall back to minimal parser
     import yaml  # type: ignore
@@ -16,15 +17,14 @@ except ModuleNotFoundError:  # pragma: no cover - fallback when pydantic missing
     ValidationError = Exception  # type: ignore
 
 from .models import (
-    ScopeConfig,
     AuthConfig,
+    AuthScheme,
+    EvidencePolicy,
     PathPolicy,
     RequestPolicy,
+    ScopeConfig,
     Timeouts,
-    EvidencePolicy,
-    AuthScheme,
 )
-
 
 # -----------------------------
 # YAML loaders

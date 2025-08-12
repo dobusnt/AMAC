@@ -3,15 +3,14 @@ from __future__ import annotations
 import html
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List
 
-import orjson
-
+from .._json import loads
 from ..diffing import analyze_summary
 
 
 def _read_json(path: Path) -> Dict[str, Any]:
-    return orjson.loads(path.read_bytes())
+    return loads(path.read_bytes())
 
 
 def _fmt_dt(dt: datetime) -> str:
