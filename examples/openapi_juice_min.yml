@@ -1,0 +1,43 @@
+openapi: 3.0.3
+info:
+  title: Juice Shop (demo) – minimal GETs
+  version: 1.0.0
+servers:
+  - url: https://demo.owasp-juice.shop
+paths:
+  /rest/products:
+    get:
+      tags: [products]
+      summary: List products
+      responses:
+        "200": { description: OK }
+  /rest/products/search:
+    get:
+      tags: [products]
+      summary: Search products
+      parameters:
+        - in: query
+          name: q
+          required: true
+          schema: { type: string, example: apple }
+      responses:
+        "200": { description: OK }
+  /api/Challenges:
+    get:
+      tags: [misc]
+      summary: Challenges list
+      responses:
+        "200": { description: OK }
+  /rest/user/whoami:
+    get:
+      tags: [users]
+      summary: Who am I (JWT)
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200": { description: OK }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

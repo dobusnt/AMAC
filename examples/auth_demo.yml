@@ -1,0 +1,6 @@
+# Ready-to-run auth for the local mock API (scripts/mock_api.py).
+# The mock server accepts Bearer tokens equal to "demo" by default.
+auth_schemes:
+  - name: "bearer_demo"
+    type: "bearer"
+    token: "demo"

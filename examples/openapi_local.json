@@ -1,0 +1,135 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Local Demo API",
+    "version": "1.0.0"
+  },
+  "servers": [
+    { "url": "http://127.0.0.1:8008" }
+  ],
+  "paths": {
+    "/status": {
+      "head": {
+        "summary": "Service status",
+        "operationId": "headStatus",
+        "responses": {
+          "200": { "description": "OK" }
+        }
+      }
+    },
+    "/users/me": {
+      "get": {
+        "summary": "Current user profile (protected)",
+        "operationId": "getMe",
+        "security": [
+          { "bearerAuth": [] }
+        ],
+        "responses": {
+          "200": {
+            "description": "User profile",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/User" }
+              }
+            }
+          },
+          "401": { "description": "Unauthorized" }
+        },
+        "tags": ["users"]
+      }
+    },
+    "/users/{id}": {
+      "get": {
+        "summary": "Public user info by ID",
+        "operationId": "getUserById",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "example": "1"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User (public fields)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/UserPublic" }
+              }
+            }
+          }
+        },
+        "tags": ["users"]
+      }
+    },
+    "/search": {
+      "get": {
+        "summary": "Search endpoint with a required query param",
+        "operationId": "search",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string" },
+            "example": "test"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "integer", "default": 1 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Search results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/UserPublic" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": ["search"]
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "schemas": {
+      "User": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "example": "1" },
+          "email": { "type": "string", "example": "user@example.com" },
+          "name": { "type": "string", "example": "Alice" },
+          "role": { "type": "string", "example": "user" }
+        }
+      },
+      "UserPublic": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "example": "1" },
+          "name": { "type": "string", "example": "Alice" }
+        }
+      }
+    }
+  }
+}

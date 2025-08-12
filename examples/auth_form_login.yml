@@ -1,0 +1,13 @@
+# Example: capture a session cookie by submitting a login form.
+auth_schemes:
+  - name: "web_session"
+    type: "form_login"
+    login_url: "https://app.example.com/login"
+    login_method: "POST"
+    username: "alice@example.com"
+    password: "REPLACE_ME"
+    username_field: "email"
+    password_field: "password"
+    extra_fields:
+      remember: "on"
+      csrf: "REPLACE_CSRF_IF_REQUIRED"

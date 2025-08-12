@@ -1,0 +1,19 @@
+auth_schemes:
+  - name: "bearer_user"
+    type: "bearer"
+    token: "REPLACE_ME_WITH_TOKEN"
+
+  # Examples of other supported types (commented out for MVP):
+  # - name: "cookie_admin"
+  #   type: "cookie"
+  #   cookie: "SESSIONID=abc123; Path=/; Secure"
+  #
+  # - name: "basic_user"
+  #   type: "basic"
+  #   username: "user1"
+  #   password: "passw0rd!"
+  #
+  # - name: "custom_header"
+  #   type: "header"
+  #   header: "X-Api-Key"
+  #   token: "abc123"

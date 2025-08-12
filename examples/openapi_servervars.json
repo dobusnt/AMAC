@@ -1,0 +1,35 @@
+{
+  "openapi": "3.0.3",
+  "info": { "title": "Server Vars Demo", "version": "1.0.0" },
+  "servers": [
+    {
+      "url": "https://api.{env}.local/v1",
+      "variables": {
+        "env": { "enum": ["dev", "stage", "prod"], "default": "dev" }
+      }
+    }
+  ],
+  "paths": {
+    "/users/{id}": {
+      "get": {
+        "summary": "Get user by ID (public fields)",
+        "operationId": "getUserById",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "example": "1" }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string", "example": "test" }
+          }
+        ],
+        "responses": { "200": { "description": "OK" } }
+      }
+    }
+  }
+}

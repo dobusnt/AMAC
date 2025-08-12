@@ -1,0 +1,2 @@
+[console_scripts]
+amac = amac.cli:app

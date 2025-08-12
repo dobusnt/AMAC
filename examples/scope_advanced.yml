@@ -1,0 +1,38 @@
+allowed:
+  - api.example.com
+  - "*.dev.example.com"
+
+denied:
+  - "admin.example.com"
+
+base_urls:
+  - "https://api.example.com"
+
+# Per-path policy (deny wins; patterns support glob or re:)
+path_policy:
+  deny_paths:
+    - "/admin/*"
+    - "re:^/internal/.*"
+  allow_paths:
+    - "/v1/*"
+    - "/status"
+
+request_policy:
+  safe_methods_only: true
+  max_rps: 2
+  concurrency: 6
+  per_host_concurrency: 2
+  global_jitter_ms: 80
+  backoff_cap_s: 3.5
+  allow_redirects: false
+  verify_tls: true
+  hard_request_budget: 200      # stop after 200 requests in a run
+
+timeouts:
+  connect: 5
+  read: 15
+
+evidence:
+  privacy_level: minimal         # none|minimal|strict
+
+evidence_dir: "./evidence"

@@ -1,0 +1,20 @@
+# Two example OAuth2 identities: client credentials and password grant.
+auth_schemes:
+  - name: "svc_client"
+    type: "oauth2"
+    grant_type: "client_credentials"
+    token_url: "https://auth.example.com/oauth2/token"
+    client_id: "REPLACE_ME"
+    client_secret: "REPLACE_ME"
+    scope: "read:users read:profile"
+    audience: "https://api.example.com"
+
+  - name: "user_password"
+    type: "oauth2"
+    grant_type: "password"
+    token_url: "https://auth.example.com/oauth2/token"
+    client_id: "REPLACE_ME"
+    client_secret: "REPLACE_ME"
+    username: "alice@example.com"
+    password: "REPLACE_ME"
+    scope: "openid profile email"

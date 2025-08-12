@@ -1,0 +1,26 @@
+# Host allowlist. Supports wildcards like "*.example.com".
+allowed:
+  - api.example.com
+  - "*.dev.example.com"
+
+# If your OpenAPI spec lacks servers[], set explicit base URLs here.
+# base_urls:
+#   - "https://api.example.com"
+
+# Optional denylist (overrides allow).
+denied:
+  - "admin.example.com"
+
+request_policy:
+  # MVP runs only safe methods (GET/HEAD). Keep true for Day 1–2.
+  safe_methods_only: true
+  # Throttle so you don't hammer targets during mapping/checking.
+  max_rps: 2
+  concurrency: 4
+
+timeouts:
+  connect: 5
+  read: 15
+
+# Where evidence or outputs would go in later milestones.
+evidence_dir: "./evidence"

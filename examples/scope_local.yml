@@ -1,0 +1,22 @@
+# Local demo scope for running against a mock API on your machine.
+allowed:
+  - "127.0.0.1"
+  - "localhost"
+
+# If your OpenAPI spec includes servers[] pointing to http://127.0.0.1:8008,
+# base_urls is not required. It’s here as a fallback.
+base_urls:
+  - "http://127.0.0.1:8008"
+
+denied: []
+
+request_policy:
+  safe_methods_only: true   # MVP: only GET/HEAD
+  max_rps: 3                # be gentle even locally
+  concurrency: 4
+
+timeouts:
+  connect: 3
+  read: 10
+
+evidence_dir: "./evidence"

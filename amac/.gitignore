@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pkl
+*.egg-info/
+.eggs/
+dist/
+build/
+pip-wheel-metadata/
+
+# Envs
+.venv/
+venv/
+.env
+.env.*
+
+# Editors / OS
+.DS_Store
+.idea/
+.vscode/
+*.code-workspace
+
+# Caches & reports
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+coverage.xml
+
+# Local outputs
+endpoints.json
+evidence/
+out/

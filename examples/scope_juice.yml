@@ -1,0 +1,31 @@
+allowed:
+  - "demo.owasp-juice.shop"
+denied: []
+base_urls:
+  - "https://demo.owasp-juice.shop"
+
+path_policy:
+  deny_paths: []
+  allow_paths:
+    - "/rest/*"
+    - "/api/*"
+
+request_policy:
+  safe_methods_only: true
+  max_rps: 1
+  concurrency: 4
+  per_host_concurrency: 2
+  global_jitter_ms: 80
+  backoff_cap_s: 3
+  allow_redirects: false
+  verify_tls: true
+  hard_request_budget: 50
+
+timeouts:
+  connect: 5
+  read: 15
+
+evidence:
+  privacy_level: minimal
+
+evidence_dir: "./evidence"
