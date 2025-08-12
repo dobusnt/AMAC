@@ -1,6 +1,4 @@
-**File: `README.md`**
 
-````markdown
 # AMAC — API Mapper + Auth Checker (pentester-friendly)
 
 **AMAC** helps ethical hackers quickly map API endpoints from OpenAPI/Swagger, probe **no-auth vs. authenticated** behavior (including multiple identities), and produce a tidy HTML report — all while respecting strict **scope safety rails**.
