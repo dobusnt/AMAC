@@ -5,24 +5,25 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-import orjson
 from rich.console import Console
-from rich.progress import Progress, BarColumn, TextColumn, TimeElapsedColumn
+from rich.progress import BarColumn, Progress, TextColumn, TimeElapsedColumn
 
-from ..models import (
-    Endpoint,
-    EndpointSet,
-    ScopeConfig,
-    AuthConfig,
-    AuthScheme,
-    RequestPolicy,
-    Timeouts,
-)
+from .._json import dumps
+from ..auth.flows import fetch_oauth2_token, perform_form_login, refresh_oauth2_token
 from ..config import assert_urls_in_scope
-from .client import HttpClient
-from ..auth.flows import fetch_oauth2_token, refresh_oauth2_token, perform_form_login
+
 # 🔧 import from package init to avoid module-attribute lookup issues
 from ..evidence import write_snapshot
+from ..models import (
+    AuthConfig,
+    AuthScheme,
+    Endpoint,
+    EndpointSet,
+    RequestPolicy,
+    ScopeConfig,
+    Timeouts,
+)
+from .client import HttpClient
 
 console = Console()
 
@@ -233,7 +234,7 @@ def _write_json(obj: Any, path: Path) -> None:
             payload = obj.__dict__  # dataclasses etc.
         except Exception:
             payload = obj
-    path.write_bytes(orjson.dumps(payload, option=orjson.OPT_INDENT_2))
+    path.write_bytes(dumps(payload))
 
 
 async def _resolve_identity(s: AuthScheme) -> AuthScheme:
