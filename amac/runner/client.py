@@ -178,6 +178,7 @@ class HttpClient:
         headers: Optional[Dict[str, str]] = None,
         cookie: Optional[str] = None,
         allow_redirects: Optional[bool] = None,  # override if needed
+        json: Any | None = None,
     ) -> Dict[str, Any]:
         """
         Perform a single HTTP request with retries, throttle, concurrency limits, jitter, and budget checks.
@@ -240,6 +241,7 @@ class HttpClient:
                         headers=hdrs,
                         auth=native_auth,
                         follow_redirects=bool(allow_redirects) if allow_redirects is not None else self._client.follow_redirects,
+                        json=json,
                     )
                     if response.status_code in RETRYABLE_STATUS and attempts < self.max_attempts:
                         await self._sleep_backoff(attempts)
@@ -259,7 +261,7 @@ class HttpClient:
             msg = str(last_exc) if last_exc else "request failed without response"
             return self._error_snapshot(method, url, "transport_error", msg, elapsed_ms, attempts)
 
-        snap = await self._snapshot_response(method, url, hdrs, response, elapsed_ms, attempts)
+        snap = await self._snapshot_response(method, url, hdrs, response, elapsed_ms, attempts, json)
         return snap
 
     async def _sleep_backoff(self, attempt: int) -> None:
@@ -276,6 +278,7 @@ class HttpClient:
         resp: httpx.Response,
         elapsed_ms: float,
         attempts: int,
+        req_json: Any | None = None,
     ) -> Dict[str, Any]:
         # Take a conservative subset of headers
         resp_headers_subset = {}
@@ -337,6 +340,8 @@ class HttpClient:
             },
             "timings": {"elapsed_ms": elapsed_ms, "attempts": attempts},
         }
+        if req_json is not None:
+            snapshot["request"]["json"] = req_json
         return snapshot
 
     def _error_snapshot(
