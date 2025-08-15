@@ -100,6 +100,41 @@ def sample_param_value(param: Dict[str, Any]) -> str:
     return _coerce_string(schema, name_hint=name)
 
 
+def sample_schema_value(schema: Dict[str, Any], name_hint: str | None = None) -> Any:
+    """Sample a value for a JSON schema object (for request bodies)."""
+    if "enum" in schema and isinstance(schema["enum"], list) and schema["enum"]:
+        return _pick_enum(schema["enum"])
+
+    typ = str(schema.get("type") or "").lower()
+    if typ == "object":
+        props = schema.get("properties") or {}
+        required = schema.get("required") or []
+        out: Dict[str, Any] = {}
+        for k, v in props.items():
+            if required and k not in required:
+                continue
+            if isinstance(v, dict):
+                out[k] = sample_schema_value(v, name_hint=k)
+        return out
+    if typ == "array":
+        items = schema.get("items") or {}
+        if isinstance(items, dict):
+            return [sample_schema_value(items)]
+        return []
+    if typ in ("integer", "number"):
+        return _coerce_number(schema)
+    if typ == "boolean":
+        return _coerce_boolean(schema)
+
+    for key in ("oneOf", "anyOf"):
+        if key in schema and isinstance(schema[key], list) and schema[key]:
+            first = schema[key][0] or {}
+            if isinstance(first, dict):
+                return sample_schema_value(first, name_hint=name_hint)
+
+    return _coerce_string(schema, name_hint=name_hint)
+
+
 def fill_server_variables(server_obj: Dict[str, Any]) -> Optional[str]:
     """
     Expand a single OpenAPI server object with variables, picking the first enum/default.

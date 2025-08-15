@@ -136,6 +136,9 @@ amac report  --run-dir out/run_YYYY-MM-DD_HH-MM-SS
 
 ### `scope.yml` (advanced example)
 
+Disable `safe_methods_only` and list `non_safe_methods` to probe operations like
+`POST` or `PUT`.
+
 ```yaml
 allowed:
   - api.example.com
@@ -155,6 +158,7 @@ path_policy:
 
 request_policy:
   safe_methods_only: true
+  non_safe_methods: []  # e.g., [POST, PUT]
   max_rps: 2
   concurrency: 6
   per_host_concurrency: 2

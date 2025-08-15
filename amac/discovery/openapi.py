@@ -12,7 +12,7 @@ except ModuleNotFoundError:  # pragma: no cover - fallback
 
 from ..config import choose_base_urls, is_url_in_scope, is_url_path_allowed
 from ..models import Endpoint, EndpointSet, ScopeConfig
-from .sampler import fill_server_variables, sample_param_value
+from .sampler import fill_server_variables, sample_param_value, sample_schema_value
 
 # -----------------------------
 # Loaders
@@ -175,13 +175,30 @@ def _build_query(params: List[Dict[str, Any]]) -> str:
     return ("?" + "&".join(items)) if items else ""
 
 
+def _sample_request_body(doc: Dict[str, Any], op_obj: Dict[str, Any]) -> Any:
+    """Return a sample JSON-compatible body for required requestBody."""
+    rb = op_obj.get("requestBody")
+    rb = _deref(rb, doc) if isinstance(rb, dict) else None
+    if not isinstance(rb, dict) or not rb.get("required"):
+        return None
+    content = rb.get("content")
+    if not isinstance(content, dict):
+        return None
+    for media in content.values():
+        schema = _deref(media.get("schema"), doc) if isinstance(media, dict) else None
+        if isinstance(schema, dict):
+            return sample_schema_value(schema)
+    return None
+
+
 # -----------------------------
 # Main mapping
 # -----------------------------
 
 async def load_and_map_openapi(openapi_src: str, scope: ScopeConfig) -> EndpointSet:
     """
-    Load OpenAPI → build EndpointSet of GET/HEAD URLs (with sampled required parameters).
+    Load OpenAPI → build EndpointSet of URLs for allowed HTTP methods
+    (with sampled required parameters and bodies).
     Handles:
       - servers[] and path-level servers (with {variables})
       - $ref for components/parameters (local pointers)
@@ -196,6 +213,12 @@ async def load_and_map_openapi(openapi_src: str, scope: ScopeConfig) -> Endpoint
 
     endpoints: List[Endpoint] = []
 
+    allowed_methods = {"get", "head"}
+    if not scope.request_policy.safe_methods_only:
+        allowed_methods.update(m.lower() for m in scope.request_policy.non_safe_methods)
+
+    valid_methods = {"get", "head", "post", "put", "delete", "patch", "options"}
+
     paths = doc.get("paths") or {}
     for raw_path, path_item in paths.items():
         if not isinstance(path_item, dict):
@@ -204,10 +227,9 @@ async def load_and_map_openapi(openapi_src: str, scope: ScopeConfig) -> Endpoint
         # Servers override for this path
         base_for_path = _path_servers(path_item) or base_urls
 
-        for method in ("get", "head"):
-            if method not in path_item:
+        for method, op_obj in path_item.items():
+            if method not in valid_methods or method not in allowed_methods:
                 continue
-            op_obj = path_item[method]
             if not isinstance(op_obj, dict):
                 continue
 
@@ -219,6 +241,9 @@ async def load_and_map_openapi(openapi_src: str, scope: ScopeConfig) -> Endpoint
             # Build concrete path with substitutions + required query
             concrete_path = _apply_path_template(str(raw_path), params)
             query = _build_query(params)
+
+            body = _sample_request_body(doc, op_obj)
+            extra = {"body": body} if body is not None else {}
 
             # Resulting URLs for each server
             for b in base_for_path:
@@ -242,6 +267,7 @@ async def load_and_map_openapi(openapi_src: str, scope: ScopeConfig) -> Endpoint
                         template=str(raw_path),
                         tags=tags if isinstance(tags, list) else [],
                         operation_id=str(op_id) if op_id else None,
+                        extra=extra,
                     )
                 )
 

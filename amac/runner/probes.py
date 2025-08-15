@@ -261,11 +261,12 @@ async def _authed_request_with_refresh(
     url: str,
     s_original: AuthScheme,
     resolved: AuthScheme,
+    json: Any | None = None,
 ) -> Dict[str, Any]:
     """
     Perform an authenticated request; if 401 and original is oauth2/form_login, try one refresh attempt.
     """
-    snap = await client.request(method, url, auth_scheme=resolved)
+    snap = await client.request(method, url, auth_scheme=resolved, json=json)
 
     # Try refresh on 401 only once
     status = snap.get("response", {}).get("status") if "response" in snap else None
@@ -274,11 +275,11 @@ async def _authed_request_with_refresh(
             # attempt refresh, else re-fetch
             new_tok = await refresh_oauth2_token(s_original) or await fetch_oauth2_token(s_original)
             resolved.token = new_tok  # type: ignore[attr-defined]
-            snap = await client.request(method, url, auth_scheme=resolved)
+            snap = await client.request(method, url, auth_scheme=resolved, json=json)
         elif s_original.type == "form_login":
             cookie = await perform_form_login(s_original)
             resolved.cookie = cookie  # type: ignore[attr-defined]
-            snap = await client.request(method, url, auth_scheme=resolved)
+            snap = await client.request(method, url, auth_scheme=resolved, json=json)
 
     return snap
 
@@ -295,9 +296,10 @@ async def _probe_one(
     Save each snapshot to disk and build both legacy and RBAC-matrix summaries.
     """
     base_name = f"{idx:05d}_{ep.method}_{_safe_stem(ep.template or ep.url)}"
+    body = ep.extra.get("body") if isinstance(ep.extra, dict) else None
 
     # 1) No-auth
-    noauth_snap = await client.request(ep.method, ep.url, auth_scheme=None)
+    noauth_snap = await client.request(ep.method, ep.url, auth_scheme=None, json=body)
     noauth_path = req_dir / f"{base_name}__noauth.json"
     write_snapshot(noauth_snap, noauth_path)
 
@@ -314,7 +316,14 @@ async def _probe_one(
     legacy_auth_size: Optional[int] = None
 
     for j, s in enumerate(identities):
-        snap = await _authed_request_with_refresh(client, ep.method, ep.url, s_original=s, resolved=s)
+        snap = await _authed_request_with_refresh(
+            client,
+            ep.method,
+            ep.url,
+            s_original=s,
+            resolved=s,
+            json=body,
+        )
         auth_path = req_dir / f"{base_name}__auth_{_safe_stem(s.name)}.json"
         write_snapshot(snap, auth_path)
 

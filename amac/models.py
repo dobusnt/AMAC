@@ -11,6 +11,7 @@ except ModuleNotFoundError:  # pragma: no cover - fallback when pydantic missing
     _USE_PYDANTIC = False
 
 PrivacyLevel = Literal["none", "minimal", "strict"]
+HttpMethod = Literal["GET", "HEAD", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"]
 
 if _USE_PYDANTIC:
     # ------------------------------------------------------------------
@@ -26,6 +27,10 @@ if _USE_PYDANTIC:
         safe_methods_only: bool = Field(
             default=True,
             description="If true, only emit safe HTTP methods (GET/HEAD) in MVP.",
+        )
+        non_safe_methods: List[HttpMethod] = Field(
+            default_factory=list,
+            description="Additional HTTP methods to allow when safe_methods_only is false.",
         )
         max_rps: int = Field(default=2, ge=1, description="Maximum requests per second across all hosts.")
         concurrency: int = Field(default=4, ge=1, description="Maximum in-flight requests (global).")
@@ -158,8 +163,6 @@ if _USE_PYDANTIC:
     class AuthConfig(BaseModel):
         auth_schemes: List[AuthScheme] = Field(default_factory=list)
 
-    HttpMethod = Literal["GET", "HEAD"]
-
     class Endpoint(BaseModel):
         method: HttpMethod
         url: str
@@ -195,6 +198,7 @@ else:
     @dataclass
     class RequestPolicy:
         safe_methods_only: bool = True
+        non_safe_methods: List[str] = field(default_factory=list)
         max_rps: int = 2
         concurrency: int = 4
         per_host_concurrency: int = 2
@@ -247,8 +251,6 @@ else:
     @dataclass
     class AuthConfig:
         auth_schemes: List[AuthScheme] = field(default_factory=list)
-
-    HttpMethod = Literal["GET", "HEAD"]
 
     @dataclass
     class Endpoint:
