@@ -95,17 +95,20 @@ if _USE_PYDANTIC:
             return self
 
     class AuthScheme(BaseModel):
+        audience: Optional[str] = None
         name: str
         type: str
         token: Optional[str] = None
         cookie: Optional[str] = None
         header: Optional[str] = None
         login_url: Optional[str] = None
+        login_method: Optional[str] = None
         username: Optional[str] = None
         password: Optional[str] = None
         client_id: Optional[str] = None
         client_secret: Optional[str] = None
         token_url: Optional[str] = None
+        refresh_token: Optional[str] = None
         grant_type: Optional[str] = None
         scope: Optional[str] = None
         username_field: Optional[str] = None
