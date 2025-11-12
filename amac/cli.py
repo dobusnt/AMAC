@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from datetime import datetime
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 import typer
 from rich.console import Console
@@ -36,7 +36,6 @@ def _main(
     version: bool = typer.Option(
         False,
         "--version",
-        "-v",
         help="Show AMAC version and exit.",
         is_eager=True,
     ),
@@ -46,7 +45,7 @@ def _main(
         raise typer.Exit()
 
     # Friendly safety banner (printed on entry)
-    console.print("[yellow]⚠ Authorized targets only.[/yellow] Respect program scope, rate limits, and ToS.")
+    console.print("[yellow]WARNING:[/yellow] Authorized targets only. Respect program scope, rate limits, and ToS.")
 
     # If no subcommand provided, show help and exit (instead of 'Missing command')
     if ctx.invoked_subcommand is None:
@@ -192,7 +191,7 @@ def _show_findings_preview(findings_json: dict, limit: int = 10) -> None:
     table.add_column("Type")
     table.add_column("Method")
     table.add_column("URL")
-    table.add_column("no→auth")
+    table.add_column("no->auth")
     table.add_column("Δsize")
     for i, f in enumerate(items, 1):
         table.add_row(
@@ -221,8 +220,6 @@ def map(
     scope: Path = typer.Option(
         ...,
         "--scope",
-        exists=True,
-        readable=True,
         help="Path to scope.yml (allowed/denied/base_urls, rate limits).",
     ),
     out: Path = typer.Option(
@@ -240,6 +237,9 @@ def map(
     Loads scope.yml, fetches/parses the OpenAPI spec, builds an EndpointSet (GET/HEAD),
     enforces scope, and writes endpoints.json.
     """
+    if not scope.exists():
+        console.print(f"[red]Error: scope file not found: {scope}[/red]")
+        raise typer.Exit(code=2)
     try:
         scope_cfg = load_scope_config(scope)
     except Exception as e:
@@ -259,7 +259,7 @@ def map(
         raise typer.Exit(code=2)
 
     console.print(
-        f"[green]Wrote {len(endpoint_set.endpoints)} endpoints →[/green] {out.resolve()}"
+        f"[green]Wrote {len(endpoint_set.endpoints)} endpoints ->[/green] {out.resolve()}"
     )
     if not no_preview:
         _show_endpoints_table(endpoint_set)
@@ -270,8 +270,6 @@ def check(
     endpoints: Path = typer.Option(
         ...,
         "--endpoints",
-        exists=True,
-        readable=True,
         help="Path to endpoints.json produced by `amac map`.",
     ),
     scope: Path = typer.Option(
@@ -284,14 +282,12 @@ def check(
     auth: Path = typer.Option(
         ...,
         "--auth",
-        exists=True,
-        readable=True,
         help="Path to auth.yml (validate auth schemes for later probes).",
     ),
-    preview: bool = typer.Option(
-        True,
-        "--preview/--no-preview",
-        help="Show a small table preview of endpoints.",
+    no_preview: bool = typer.Option(
+        False,
+        "--no-preview",
+        help="Do not show a table preview of endpoints.",
     ),
 ):
     """
@@ -300,6 +296,15 @@ def check(
       - auth.yml structure (at least one scheme, required fields present)
       - endpoints.json structure, and that all URLs are within scope
     """
+    if not scope.exists() or not scope.is_file():
+        console.print(f"[red]Error: scope file not found: {scope}[/red]")
+        raise typer.Exit(code=2)
+    if not auth.exists() or not auth.is_file():
+        console.print(f"[red]Error: auth file not found: {auth}[/red]")
+        raise typer.Exit(code=2)
+    if not endpoints.exists() or not endpoints.is_file():
+        console.print(f"[red]Error: endpoints file not found: {endpoints}[/red]")
+        raise typer.Exit(code=2)
     try:
         scope_cfg = load_scope_config(scope)
     except Exception as e:
@@ -331,7 +336,7 @@ def check(
     console.print(f"[bold]Endpoints:[/bold] {n}")
     console.print(f"[bold]Auth schemes:[/bold] {identities}")
 
-    if preview and n:
+    if not no_preview and n:
         _show_endpoints_table(es)
 
 
@@ -340,8 +345,6 @@ def probe(
     endpoints: Path = typer.Option(
         ...,
         "--endpoints",
-        exists=True,
-        readable=True,
         help="Path to endpoints.json produced by `amac map`.",
     ),
     scope: Path = typer.Option(
@@ -364,7 +367,7 @@ def probe(
         help="Which identities to use from auth.yml: 'first' or 'all'.",
         case_sensitive=False,
     ),
-    out_dir: Path | None = typer.Option(
+    out_dir: Optional[Path] = typer.Option(
         None,
         "--out-dir",
         help="Directory to write snapshots and summary.json (default: out/run_YYYY-MM-DD_HH-MM-SS).",
@@ -374,10 +377,10 @@ def probe(
         "--dry-run",
         help="Plan requests only; don't send network traffic.",
     ),
-    preview: bool = typer.Option(
-        True,
-        "--preview/--no-preview",
-        help="Show a small table preview of probe results.",
+    no_preview: bool = typer.Option(
+        False,
+        "--no-preview",
+        help="Do not show a table preview of probe results.",
     ),
 ):
     """
@@ -393,6 +396,15 @@ def probe(
 
     use_all = (identities or "all").lower() != "first"
 
+    if not scope.exists() or not scope.is_file():
+        console.print(f"[red]Error: scope file not found: {scope}[/red]")
+        raise typer.Exit(code=2)
+    if not auth.exists() or not auth.is_file():
+        console.print(f"[red]Error: auth file not found: {auth}[/red]")
+        raise typer.Exit(code=2)
+    if not endpoints.exists() or not endpoints.is_file():
+        console.print(f"[red]Error: endpoints file not found: {endpoints}[/red]")
+        raise typer.Exit(code=2)
     try:
         scope_cfg = load_scope_config(scope)
     except Exception as e:
@@ -434,10 +446,10 @@ def probe(
         raise typer.Exit(code=2)
 
     console.print(
-        f"[green]{'Dry-run planned' if dry_run else 'Probes complete'}.[/green] Summary → {meta['summary']}\nRequests → {meta['requests_dir']}"
+        f"[green]{'Dry-run planned' if dry_run else 'Probes complete'}.[/green] Summary -> {meta['summary']}\nRequests -> {meta['requests_dir']}"
     )
 
-    if preview:
+    if not no_preview:
         try:
             summary_json = _read_json(Path(meta["summary"]))
             if dry_run:
@@ -449,21 +461,22 @@ def probe(
             pass
 
 
-@app.command(help="Analyze a probe run directory → findings.json + findings.md.")
+@app.command(help="Analyze a probe run directory -> findings.json + findings.md.")
 def analyze(
     run_dir: Path = typer.Option(
         ...,
         "--run-dir",
-        exists=True,
-        readable=True,
         help="Directory created by `amac probe` (contains summary.json).",
     ),
-    preview: bool = typer.Option(
-        True,
-        "--preview/--no-preview",
-        help="Show a short summary of findings.",
+    no_preview: bool = typer.Option(
+        False,
+        "--no-preview",
+        help="Do not show a summary of findings.",
     ),
 ):
+    if not run_dir.exists() or not run_dir.is_dir():
+        console.print(f"[red]Error: run directory not found: {run_dir}[/red]")
+        raise typer.Exit(code=2)
     try:
         findings_json_path, findings_md_path = analyze_run_dir(run_dir)
     except Exception as e:
@@ -471,10 +484,10 @@ def analyze(
         raise typer.Exit(code=2)
 
     console.print(
-        f"[green]Wrote findings.[/green]\nJSON → {findings_json_path}\nMarkdown → {findings_md_path}"
+        f"[green]Wrote findings.[/green]\nJSON -> {findings_json_path}\nMarkdown -> {findings_md_path}"
     )
 
-    if preview:
+    if not no_preview:
         try:
             findings_json = _read_json(Path(findings_json_path))
             _show_findings_preview(findings_json)
@@ -487,23 +500,24 @@ def report(
     run_dir: Path = typer.Option(
         ...,
         "--run-dir",
-        exists=True,
-        readable=True,
         help="Directory created by `amac probe` (contains summary.json).",
     ),
-    out_html: Path | None = typer.Option(
+    out_html: Optional[Path] = typer.Option(
         None,
         "--out-html",
         help="Path to write HTML report (default: {run_dir}/report.html).",
     ),
 ):
+    if not run_dir.exists() or not run_dir.is_dir():
+        console.print(f"[red]Error: run directory not found: {run_dir}[/red]")
+        raise typer.Exit(code=2)
     try:
         html_path = render_report(run_dir, out_html)
     except Exception as e:
         console.print(f"[red]Report generation failed:[/red] {e}")
         raise typer.Exit(code=2)
 
-    console.print(f"[green]Report written →[/green] {html_path.resolve()}")
+    console.print(f"[green]Report written ->[/green] {html_path.resolve()}")
 
 
 if __name__ == "__main__":
