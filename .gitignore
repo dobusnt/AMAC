@@ -1,0 +1,50 @@
+# Python build artifacts
+*.egg-info/
+*.egg
+dist/
+build/
+*.pyc
+__pycache__/
+*.pyo
+*.pyd
+.Python
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Output directories
+out/
+*.json
+!examples/*.json
+!examples/*.yml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.log
+*.bak
+
+# User-specific configs (if you want to keep them local)
+scope_real.yml
+auth_real.yml
+endpoints_*.json
+
