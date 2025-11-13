@@ -5,7 +5,7 @@ description = "AMAC — API Mapper + Auth Checker"
 readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.10"
-authors = [{ name = "You" }]
+authors = [{ name = "Dobusnt" }]
 
 dependencies = [
   "typer>=0.12",
