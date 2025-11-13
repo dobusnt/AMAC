@@ -3,12 +3,13 @@ from __future__ import annotations
 import asyncio
 import base64
 import hashlib
+import json
 import random
 import re
 import time
 from collections import defaultdict, deque
 from typing import Any, Dict, Optional
-from urllib.parse import urlparse
+from urllib.parse import urlencode, urlparse
 
 import httpx
 
@@ -109,6 +110,55 @@ def _host_of(url: str) -> str:
     return (urlparse(url).hostname or "").lower()
 
 
+def _format_request_body(body_data: Any, content_type: str) -> tuple[Any, Dict[str, str]]:
+    """
+    Format request body data based on content type.
+    Returns (formatted_body, headers_dict).
+    Note: For JSON, returns the original data (httpx will serialize it).
+    """
+    headers: Dict[str, str] = {}
+    
+    if content_type == "application/json":
+        headers["Content-Type"] = "application/json"
+        return body_data, headers  # httpx will serialize JSON
+    
+    elif content_type == "application/x-www-form-urlencoded":
+        headers["Content-Type"] = "application/x-www-form-urlencoded"
+        if isinstance(body_data, dict):
+            # Convert dict to form-encoded string
+            form_data = {}
+            for k, v in body_data.items():
+                if v is not None:
+                    form_data[str(k)] = str(v)
+            return urlencode(form_data), headers
+        elif isinstance(body_data, str):
+            return body_data, headers
+        return None, headers
+    
+    elif content_type == "multipart/form-data":
+        # For multipart, httpx expects a dict or files
+        # We'll use a simple dict and let httpx handle it
+        if isinstance(body_data, dict):
+            return body_data, headers  # httpx will set Content-Type with boundary
+        return None, headers
+    
+    elif content_type in ("text/plain", "text/xml", "application/xml"):
+        headers["Content-Type"] = content_type
+        if isinstance(body_data, str):
+            return body_data, headers
+        elif isinstance(body_data, (dict, list)):
+            # Convert to JSON string for text content types (fallback)
+            return json.dumps(body_data), headers
+        return str(body_data) if body_data is not None else None, headers
+    
+    else:
+        # Default: try JSON
+        headers["Content-Type"] = "application/json"
+        if body_data is not None:
+            return json.dumps(body_data), headers
+        return None, headers
+
+
 class HttpClient:
     """
     Thin wrapper over httpx.AsyncClient with:
@@ -179,6 +229,8 @@ class HttpClient:
         cookie: Optional[str] = None,
         allow_redirects: Optional[bool] = None,  # override if needed
         json: Any | None = None,
+        content: Any | None = None,
+        content_type: str | None = None,
     ) -> Dict[str, Any]:
         """
         Perform a single HTTP request with retries, throttle, concurrency limits, jitter, and budget checks.
@@ -198,6 +250,16 @@ class HttpClient:
         hdrs: Dict[str, str] = {}
         if headers:
             hdrs.update(headers)
+        
+        # Format request body based on content type
+        request_body: Any = None
+        if content is not None and content_type:
+            request_body, body_headers = _format_request_body(content, content_type)
+            hdrs.update(body_headers)
+        elif json is not None:
+            # Legacy support: json parameter
+            if "Content-Type" not in hdrs:
+                hdrs["Content-Type"] = "application/json"
 
         # Inject auth
         cookies_hdr: Optional[str] = cookie
@@ -235,14 +297,38 @@ class HttpClient:
                     if auth_scheme and auth_scheme.type == "basic":
                         native_auth = (auth_scheme.username or "", auth_scheme.password or "")
 
-                    response = await self._client.request(
-                        method.upper(),
-                        url,
-                        headers=hdrs,
-                        auth=native_auth,
-                        follow_redirects=bool(allow_redirects) if allow_redirects is not None else self._client.follow_redirects,
-                        json=json,
-                    )
+                    # Prepare request kwargs based on content type
+                    request_kwargs: Dict[str, Any] = {
+                        "method": method.upper(),
+                        "url": url,
+                        "headers": hdrs,
+                        "auth": native_auth,
+                        "follow_redirects": bool(allow_redirects) if allow_redirects is not None else self._client.follow_redirects,
+                    }
+                    
+                    # Add body based on content type
+                    if request_body is not None:
+                        if content_type == "application/json":
+                            # For JSON, use the original data (not the stringified version)
+                            if content is not None:
+                                request_kwargs["json"] = content
+                            elif json is not None:
+                                request_kwargs["json"] = json
+                            else:
+                                # Fallback: parse if string
+                                request_kwargs["json"] = json.loads(request_body) if isinstance(request_body, str) else request_body
+                        elif content_type == "multipart/form-data":
+                            request_kwargs["files"] = request_body if isinstance(request_body, dict) else {}
+                        elif content_type == "application/x-www-form-urlencoded":
+                            request_kwargs["data"] = request_body
+                        else:
+                            # For text/plain, xml, etc.
+                            request_kwargs["content"] = request_body.encode("utf-8") if isinstance(request_body, str) else str(request_body).encode("utf-8")
+                    elif json is not None:
+                        # Legacy: json parameter without content_type
+                        request_kwargs["json"] = json
+                    
+                    response = await self._client.request(**request_kwargs)
                     if response.status_code in RETRYABLE_STATUS and attempts < self.max_attempts:
                         await self._sleep_backoff(attempts)
                         continue
@@ -261,7 +347,9 @@ class HttpClient:
             msg = str(last_exc) if last_exc else "request failed without response"
             return self._error_snapshot(method, url, "transport_error", msg, elapsed_ms, attempts)
 
-        snap = await self._snapshot_response(method, url, hdrs, response, elapsed_ms, attempts, json)
+        # Determine body data for snapshot
+        body_for_snapshot = json if json is not None else content
+        snap = await self._snapshot_response(method, url, hdrs, response, elapsed_ms, attempts, body_for_snapshot, content_type)
         return snap
 
     async def _sleep_backoff(self, attempt: int) -> None:
@@ -278,7 +366,8 @@ class HttpClient:
         resp: httpx.Response,
         elapsed_ms: float,
         attempts: int,
-        req_json: Any | None = None,
+        req_body: Any | None = None,
+        content_type: str | None = None,
     ) -> Dict[str, Any]:
         # Take a conservative subset of headers
         resp_headers_subset = {}
@@ -340,8 +429,18 @@ class HttpClient:
             },
             "timings": {"elapsed_ms": elapsed_ms, "attempts": attempts},
         }
-        if req_json is not None:
-            snapshot["request"]["json"] = req_json
+        # Add request body to snapshot (redacted for privacy)
+        if req_body is not None:
+            if content_type == "application/json":
+                snapshot["request"]["json"] = req_body
+            elif content_type == "application/x-www-form-urlencoded":
+                snapshot["request"]["form_data"] = req_body if isinstance(req_body, str) else str(req_body)
+            elif content_type == "multipart/form-data":
+                snapshot["request"]["multipart"] = "<redacted>"  # Don't log multipart data
+            else:
+                snapshot["request"]["body"] = str(req_body)[:200]  # Truncate for privacy
+            if content_type:
+                snapshot["request"]["content_type"] = content_type
         return snapshot
 
     def _error_snapshot(

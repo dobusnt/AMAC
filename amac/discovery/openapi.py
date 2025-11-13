@@ -175,19 +175,51 @@ def _build_query(params: List[Dict[str, Any]]) -> str:
     return ("?" + "&".join(items)) if items else ""
 
 
-def _sample_request_body(doc: Dict[str, Any], op_obj: Dict[str, Any]) -> Any:
-    """Return a sample JSON-compatible body for required requestBody."""
+def _sample_request_body(doc: Dict[str, Any], op_obj: Dict[str, Any]) -> tuple[Any, str] | None:
+    """
+    Return a sample body for required requestBody with content type information.
+    Supports multiple content types: JSON, form-urlencoded, multipart, text/plain, etc.
+    
+    Returns:
+        Tuple of (body_data, content_type) or None if no request body
+    """
     rb = op_obj.get("requestBody")
     rb = _deref(rb, doc) if isinstance(rb, dict) else None
     if not isinstance(rb, dict) or not rb.get("required"):
         return None
+    
     content = rb.get("content")
     if not isinstance(content, dict):
         return None
-    for media in content.values():
-        schema = _deref(media.get("schema"), doc) if isinstance(media, dict) else None
-        if isinstance(schema, dict):
-            return sample_schema_value(schema)
+    
+    # Priority order: prefer JSON, then form-urlencoded, then multipart, then others
+    content_type_priority = [
+        "application/json",
+        "application/x-www-form-urlencoded",
+        "multipart/form-data",
+        "text/plain",
+        "text/xml",
+        "application/xml",
+    ]
+    
+    # Try priority content types first
+    for preferred_type in content_type_priority:
+        if preferred_type in content:
+            media = content[preferred_type]
+            if isinstance(media, dict):
+                schema = _deref(media.get("schema"), doc) if isinstance(media, dict) else None
+                if isinstance(schema, dict):
+                    body_data = sample_schema_value(schema, doc=doc)
+                    return (body_data, preferred_type)
+    
+    # Fallback: try any content type
+    for content_type, media in content.items():
+        if isinstance(media, dict):
+            schema = _deref(media.get("schema"), doc) if isinstance(media, dict) else None
+            if isinstance(schema, dict):
+                body_data = sample_schema_value(schema, doc=doc)
+                return (body_data, content_type)
+    
     return None
 
 
@@ -242,8 +274,32 @@ async def load_and_map_openapi(openapi_src: str, scope: ScopeConfig) -> Endpoint
             concrete_path = _apply_path_template(str(raw_path), params)
             query = _build_query(params)
 
-            body = _sample_request_body(doc, op_obj)
-            extra = {"body": body} if body is not None else {}
+            # Sample request body if present
+            body_result = _sample_request_body(doc, op_obj)
+            extra = {}
+            if body_result is not None:
+                body_data, content_type = body_result
+                
+                # Validate generated body against schema
+                rb = op_obj.get("requestBody")
+                rb = _deref(rb, doc) if isinstance(rb, dict) else None
+                if isinstance(rb, dict):
+                    content = rb.get("content") or {}
+                    media = content.get(content_type) if isinstance(content, dict) else None
+                    if isinstance(media, dict):
+                        schema = _deref(media.get("schema"), doc) if isinstance(media, dict) else None
+                        if isinstance(schema, dict):
+                            from .sampler import validate_generated_body
+                            is_valid, error = validate_generated_body(body_data, schema, doc)
+                            if not is_valid:
+                                # Log warning but continue - validation is best-effort
+                                import logging
+                                logging.warning(f"Generated body validation failed for {method} {raw_path}: {error}")
+                
+                extra = {
+                    "body": body_data,
+                    "content_type": content_type,
+                }
 
             # Resulting URLs for each server
             for b in base_for_path:
